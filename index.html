@@ -90,7 +90,7 @@ main{padding:0 16px}
 .addrow input{min-height:44px}
 .addrow button{min-height:44px;padding:0 14px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-weight:600;white-space:nowrap}
 .hint{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5}
-.nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+.nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
 .nav button{min-height:58px;font-size:12px;color:var(--sub)}
 .nav button.on{color:var(--text);font-weight:700}
 .fab{position:fixed;right:16px;bottom:calc(74px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-size:30px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:6}
@@ -129,11 +129,6 @@ main{padding:0 16px}
     <div class="kpis" id="kpis"></div>
     <div class="mom" id="mom"></div>
 
-    <div class="card">
-      <h3>작성자별 지출</h3>
-      <div class="split" id="ownSplit"></div>
-      <div class="legend" id="ownLegend"></div>
-    </div>
 
     <div class="card">
       <h3>카테고리별 지출 TOP 5</h3>
@@ -168,17 +163,6 @@ main{padding:0 16px}
     <div id="listBody"></div>
   </section>
 
-  <!-- 정산 -->
-  <section id="tab-settle" class="tab hidden">
-    <div class="card">
-      <h3>정산 기간 (공동지출 기준)</h3>
-      <div class="filters">
-        <input type="date" id="sFrom" aria-label="시작일">
-        <input type="date" id="sTo" aria-label="종료일">
-      </div>
-    </div>
-    <div class="card" id="settleOut"></div>
-  </section>
 
   <!-- 설정 -->
   <section id="tab-set" class="tab hidden">
@@ -239,7 +223,6 @@ main{padding:0 16px}
 <nav class="nav" id="nav">
   <button data-tab="home" class="on">홈</button>
   <button data-tab="list">내역</button>
-  <button data-tab="settle">정산</button>
   <button data-tab="set">설정</button>
 </nav>
 <button class="fab" id="fab" aria-label="거래 입력">+</button>
@@ -262,11 +245,8 @@ main{padding:0 16px}
     <div class="chips" id="fCatChips"></div>
     <label class="label">결제수단</label>
     <div class="chips" id="fPayChips"></div>
-    <label class="label">작성자</label>
+    <label class="label">입력한 사람</label>
     <div class="chips" id="fOwnerChips"></div>
-    <div id="fSharedWrap">
-      <label class="check"><input type="checkbox" id="fShared"> 공동지출 (정산에 포함)</label>
-    </div>
     <label class="label">메모</label>
     <input id="fMemo" maxlength="60" placeholder="예: 마트 장보기">
     <button class="btn danger hidden" id="fDel" style="margin-top:12px">이 거래 삭제</button>
@@ -458,15 +438,6 @@ function renderHome() {
   const pct = prevExp ? Math.round(Math.abs(diff) / prevExp * 100) : null;
   $('#mom').textContent = `전월 대비 지출 ${diff > 0 ? '▲' : diff < 0 ? '▼' : '–'} ${won(Math.abs(diff))}${pct !== null ? ` (${pct}%)` : ''}`;
 
-  // 작성자별
-  const byOwner = names().map(n => cur.filter(t => t.type === '지출' && t.owner === n).reduce((a, t) => a + t.amount, 0));
-  const total = byOwner[0] + byOwner[1];
-  $('#ownSplit').innerHTML = total
-    ? `<i class="h" style="width:${byOwner[0] / total * 100}%;background:var(--h)"></i><i style="width:${byOwner[1] / total * 100}%;background:var(--w)"></i>`
-    : '';
-  $('#ownLegend').innerHTML = names().map((n, i) =>
-    `<span><span class="dot" style="background:${i ? 'var(--w)' : 'var(--h)'}"></span>${esc(n)} ${won(byOwner[i])}${total ? ` (${Math.round(byOwner[i] / total * 100)}%)` : ''}</span>`
-  ).join('<span></span>');
 
   // 카테고리 TOP 5
   const catMap = {};
@@ -608,7 +579,7 @@ function showTab(name, fromPop) {
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('hidden', s.id !== 'tab-' + name));
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   $('#fab').classList.toggle('hidden', name === 'set');
-  $('#hdrTitle').textContent = { home: '가계부', list: '내역', settle: '정산', set: '설정' }[name];
+  $('#hdrTitle').textContent = { home: '가계부', list: '내역', set: '설정' }[name];
   if (!fromPop && name !== 'home' && !(history.state && history.state.l === 'tab')) history.pushState({ l: 'tab' }, '');
   renderAll();
   window.scrollTo(0, 0);
@@ -617,7 +588,6 @@ function showTab(name, fromPop) {
 function renderAll() {
   renderHome();
   if (tab === 'list') renderList();
-  if (tab === 'settle') renderSettle();
   if (tab === 'set') renderSet();
   renderSyncLabel();
 }
@@ -632,7 +602,6 @@ function openSheet(id) {
   $('#fDate').value = t ? t.date : today();
   $('#fAmt').value = t ? num(t.amount) : '';
   $('#fMemo').value = t ? (t.memo || '') : '';
-  $('#fShared').checked = !!(t && t.shared);
   $('#fDel').classList.toggle('hidden', !t);
   $('#sheetTitle').textContent = t ? '거래 수정' : '거래 입력';
   renderForm();
@@ -653,7 +622,6 @@ function renderForm() {
   $('#fCatChips').innerHTML = (S.categories[f.type] || []).map(c => `<button class="chip ${f.category === c ? 'on' : ''}" data-k="category" data-v="${esc(c)}">${esc(c)}</button>`).join('');
   $('#fPayChips').innerHTML = S.payments.map(p => `<button class="chip ${f.payment === p ? 'on' : ''}" data-k="payment" data-v="${esc(p)}">${esc(p)}</button>`).join('');
   $('#fOwnerChips').innerHTML = ['h', 'w'].map(r => `<button class="chip own-${r} ${f.owner === r ? 'on' : ''}" data-k="owner" data-v="${r}">${esc(S.names[r])}</button>`).join('');
-  $('#fSharedWrap').classList.toggle('hidden', f.type !== '지출');
 }
 
 function saveForm() {
@@ -668,7 +636,7 @@ function saveForm() {
   if (!t) { t = { id: uid(), createdAt: nowStr() }; txs.push(t); }
   Object.assign(t, {
     date, amount: Math.round(amount), type: f.type, category: f.category, payment: f.payment,
-    owner: nameOf(f.owner), shared: $('#fShared').checked && f.type === '지출',
+    owner: nameOf(f.owner), shared: false,
     memo: $('#fMemo').value.trim(), deleted: false
   });
   touch(t);
@@ -841,9 +809,6 @@ function bind() {
   $('#fQ').addEventListener('input', renderList);
   $('#listBody').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) openSheet(b.dataset.id); });
 
-  // 정산
-  $('#sFrom').addEventListener('change', renderSettle);
-  $('#sTo').addEventListener('change', renderSettle);
 
   // 설정
   $('#saveNames').addEventListener('click', saveNames);
