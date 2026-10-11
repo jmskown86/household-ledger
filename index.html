@@ -590,16 +590,14 @@ function renderSet() {
 }
 
 function editorBlock(title, items, key) {
-  const chips = items.map((it, i) => `
-    <span class="chip" style="display:inline-flex;align-items:center;gap:2px;padding-right:4px">
-      <button class="mini" data-mv="${key}" data-i="${i}" data-d="-1" aria-label="앞으로">◀</button>
-      <span style="padding:0 4px">${esc(it)}</span>
-      <button class="mini" data-mv="${key}" data-i="${i}" data-d="1" aria-label="뒤로">▶</button>
-      <button class="mini" data-rm="${key}" data-i="${i}" aria-label="삭제">✕</button>
-    </span>`).join('');
-  return `<div style="margin-bottom:12px">
-    ${key.startsWith('cat') ? `<div class="label" style="margin:0 0 4px">${title}</div>` : ''}
-    <div class="chips">${chips}</div>
+  const opts = items.map((it, i) => `<option value="${i}">${esc(it)}</option>`).join('');
+  return `<div style="margin-bottom:14px">
+    ${key.startsWith('cat') ? `<div class="label" style="margin:0 0 6px">${title}</div>` : ''}
+    <div class="edit-row" style="flex-wrap:nowrap">
+      <select data-sel="${key}" style="flex:1;min-width:0">${opts || '<option value="">항목 없음</option>'}</select>
+      <button class="mini" data-act="edit" data-key="${key}" style="min-width:56px">수정</button>
+      <button class="mini" data-act="del" data-key="${key}" style="min-width:56px;color:var(--danger)">삭제</button>
+    </div>
     <div class="addrow"><input data-newfor="${key}" placeholder="새 항목 이름" maxlength="12"><button data-add="${key}">추가</button></div>
   </div>`;
 }
@@ -882,25 +880,44 @@ function bind() {
   });
 }
 
+function listOf(k) { return k.startsWith('cat:') ? S.categories[k.slice(4)] : S.payments; }
+
 function onEditor(e) {
-  const key = e.target.closest('[data-mv],[data-rm],[data-add]');
-  if (!key) return;
-  const k = key.dataset.mv ? key.dataset.mv : key.dataset.rm ? key.dataset.rm : key.dataset.add;
-  const list = k.startsWith('cat:') ? S.categories[k.slice(4)] : S.payments;
-  if (key.dataset.add) {
-    const inp = document.querySelector(`[data-newfor="${k}"]`);
-    const v = inp.value.trim();
+  const btn = e.target.closest('[data-act],[data-add]');
+  if (!btn) return;
+
+  // 추가
+  if (btn.dataset.add) {
+    const k = btn.dataset.add, list = listOf(k);
+    const v = (document.querySelector(`[data-newfor="${k}"]`).value || '').trim();
     if (!v) return toast('이름을 입력해 주세요');
     if (list.includes(v)) return toast('이미 있는 항목입니다');
     editList(k, arr => [...arr, v]);
-  } else if (key.dataset.rm) {
-    const i = Number(key.dataset.i);
-    if (!confirm(`"${list[i]}" 항목을 삭제할까요?`)) return;
+    document.querySelector(`[data-newfor="${k}"]`).value = '';
+    toast('추가됨');
+    return;
+  }
+
+  // 수정 / 삭제: 드롭다운에서 고른 항목 기준
+  const k = btn.dataset.key, list = listOf(k);
+  const sel = document.querySelector(`[data-sel="${k}"]`);
+  const i = sel ? Number(sel.value) : NaN;
+  if (isNaN(i) || i < 0 || i >= list.length) return toast('항목을 먼저 선택해 주세요');
+
+  if (btn.dataset.act === 'del') {
+    if (!confirm(`"${list[i]}" 항목을 삭제할까요?\n(이미 입력한 거래의 이름은 그대로 남습니다)`)) return;
     editList(k, arr => arr.filter((_, j) => j !== i));
-  } else if (key.dataset.mv) {
-    const i = Number(key.dataset.i), d = Number(key.dataset.d), j = i + d;
-    if (j < 0 || j >= list.length) return;
-    editList(k, arr => { const c = [...arr]; [c[i], c[j]] = [c[j], c[i]]; return c; });
+    toast('삭제됨');
+  } else if (btn.dataset.act === 'edit') {
+    const old = list[i];
+    const nv = (prompt('새 이름을 입력하세요', old) || '').trim();
+    if (!nv || nv === old) return;
+    if (list.includes(nv)) return toast('이미 있는 항목입니다');
+    // 기존 거래에 적힌 이름도 함께 바꿉니다
+    if (k.startsWith('cat:')) txs.forEach(t => { if (t.category === old) { t.category = nv; touch(t); } });
+    else txs.forEach(t => { if (t.payment === old) { t.payment = nv; touch(t); } });
+    editList(k, arr => arr.map((x, j) => (j === i ? nv : x)));
+    toast('이름 변경됨');
   }
 }
 
