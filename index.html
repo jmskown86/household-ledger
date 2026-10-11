@@ -141,11 +141,6 @@ main{padding:0 16px}
     </div>
 
     <div class="card">
-      <h3>예산 진행</h3>
-      <div id="budgetProg"></div>
-    </div>
-
-    <div class="card">
       <h3>최근 30일 지출</h3>
       <div class="bars" id="daily"></div>
       <div class="axis"><span id="dailyFrom"></span><span id="dailyTo"></span></div>
@@ -483,17 +478,6 @@ function renderHome() {
       <div class="track"><div class="fill" style="width:${v / maxC * 100}%"></div></div>
       <span class="val">${num(v)}</span><span class="pc">${exp ? Math.round(v / exp * 100) : 0}%</span></div>`).join('')
     : '<div class="empty">지출 내역이 없습니다</div>';
-
-  // 예산 진행
-  const bl = budgets.filter(b => b.month === month && b.category !== '전체');
-  $('#budgetProg').innerHTML = bl.length ? bl.map(b => {
-    const spent = catMap[b.category] || 0;
-    const p = b.amount ? spent / b.amount * 100 : 0;
-    const cls = p > 100 ? 'over' : p >= 80 ? 'warn' : '';
-    return `<div class="row"><span class="nm">${esc(b.category)}</span>
-      <div class="track"><div class="fill ${cls}" style="width:${Math.min(p, 100)}%"></div></div>
-      <span class="val">${num(spent)}/${num(b.amount)}</span><span class="pc">${Math.round(p)}%</span></div>`;
-  }).join('') : '<div class="empty">설정 탭에서 예산을 입력하세요</div>';
 
   // 최근 30일
   const all = activeTx().filter(t => t.type === '지출');
